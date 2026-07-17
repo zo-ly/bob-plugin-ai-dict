@@ -21,11 +21,7 @@ Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/o
 
 ## 安装
 
-```bash
-cd bob-plugin-ai-dict
-zip -r ai-dict.bobplugin info.json main.js
-open ai-dict.bobplugin   # 双击安装进 Bob
-```
+到 [Releases](https://github.com/zo-ly/bob-plugin-ai-dict/releases) 下载最新的 `ai-dict-x.x.x.bobplugin`，双击安装进 Bob。之后 Bob 会通过 `appcast.json` 自动检查更新。
 
 然后在 Bob「设置 → 服务」中添加「AI Dict 翻译」，填写配置。
 
@@ -44,6 +40,6 @@ open ai-dict.bobplugin   # 双击安装进 Bob
 - `info.json` — 插件元信息与用户选项
 - `main.js` — `supportLanguages()` + `translate(query, completion)`，无构建步骤
 
-改完代码重新打 zip 安装即可（版本号 +1 才会覆盖提示）。
+改完代码用 `./scripts/package.sh` 重新打包安装即可（版本号 +1 才会覆盖提示）。
 
 词典 JSON 的结构约束见 `main.js` 里的 `buildToDict()`：`parts` 至少一项才走词典展示；`phonetic.type` 只允许 `us`/`uk`。

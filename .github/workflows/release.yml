@@ -1,0 +1,92 @@
+name: Release
+
+# 推送 v* 标签时触发：打包 .bobplugin → 更新 appcast.json → 创建 GitHub Release。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # 允许提交 appcast.json 回 main、创建 Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # 检出 main 分支以便把 appcast.json 提交回去
+          fetch-depth: 0 # 拉全历史与标签，便于读取 tag message
+
+      - name: 解析版本号
+        id: v
+        run: |
+          TAG="${GITHUB_REF_NAME}"          # 例如 v0.2.0
+          VERSION="${TAG#v}"                # 去掉前缀 v → 0.2.0
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: 校验 info.json 版本与标签一致
+        run: |
+          INFO_VERSION=$(jq -r .version info.json)
+          if [ "$INFO_VERSION" != "${{ steps.v.outputs.version }}" ]; then
+            echo "::error::info.json 版本 ($INFO_VERSION) 与标签 (${{ steps.v.outputs.version }}) 不一致"
+            exit 1
+          fi
+
+      - name: 读取发布说明（取自标签信息）
+        id: desc
+        run: |
+          DESC=$(git tag -l --format='%(contents:subject)' "${{ steps.v.outputs.tag }}")
+          [ -z "$DESC" ] && DESC="Release ${{ steps.v.outputs.tag }}"
+          echo "text=$DESC" >> "$GITHUB_OUTPUT"
+
+      - name: 打包 .bobplugin
+        id: pkg
+        run: |
+          FILE="ai-dict-${{ steps.v.outputs.version }}.bobplugin"
+          FILES=(info.json main.js)
+          [ -f icon.png ] && FILES+=(icon.png)
+          zip -j "$FILE" "${FILES[@]}"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$FILE" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: 更新 appcast.json
+        run: |
+          VERSION="${{ steps.v.outputs.version }}"
+          TAG="${{ steps.v.outputs.tag }}"
+          SHA="${{ steps.pkg.outputs.sha256 }}"
+          FILE="${{ steps.pkg.outputs.file }}"
+          DESC="${{ steps.desc.outputs.text }}"
+          IDENTIFIER=$(jq -r .identifier info.json)
+          MINBOB=$(jq -r .minBobVersion info.json)
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FILE}"
+
+          [ -f appcast.json ] || echo "{\"identifier\":\"$IDENTIFIER\",\"versions\":[]}" > appcast.json
+
+          # 移除同版本旧条目后，把新版本插到最前面
+          jq --arg v "$VERSION" --arg d "$DESC" --arg s "$SHA" --arg u "$URL" --arg m "$MINBOB" --arg id "$IDENTIFIER" '
+            .identifier = $id
+            | .versions = ([{version:$v, desc:$d, sha256:$s, url:$u, minBobVersion:$m}]
+                           + (.versions | map(select(.version != $v))))
+          ' appcast.json > appcast.tmp.json
+          mv appcast.tmp.json appcast.json
+
+      - name: 提交 appcast.json 回 main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet appcast.json; then
+            git add appcast.json
+            git commit -m "🤖 chore: 更新 appcast.json (${{ steps.v.outputs.tag }})"
+            git push origin main
+          fi
+
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" \
+            "${{ steps.pkg.outputs.file }}" \
+            --title "${{ steps.v.outputs.tag }}" \
+            --notes "${{ steps.desc.outputs.text }}"
