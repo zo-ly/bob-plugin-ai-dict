@@ -2,6 +2,14 @@
 
 LLM 翻译插件：**句子正常翻译，单词/短语返回 Bob 原生词典卡片**（音标、词性词义、变形、例句），而不是一段像词典的纯文本。
 
+## 效果
+
+| 单词 → 词典卡片 | 句子 → 普通翻译 |
+|:---:|:---:|
+| <img src="screenshots/dict-mode.png" width="380" alt="查单词：音标、词性词义、复数变形、例句、记忆提示"> | <img src="screenshots/sentence-mode.png" width="380" alt="翻译整句：与其他 AI 服务一致的普通译文"> |
+
+查单词时展示音标（美/英）、词性词义、变形（可点击跳查）、例句和词根记忆提示；整句输入自动切回普通翻译模式。
+
 ## 原理
 
 Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/object/translateresult.html) 结构时才渲染。本插件：
