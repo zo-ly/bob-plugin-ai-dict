@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.0.3",
+      "desc": "换回原插件图标",
+      "sha256": "8d46ce0da3c56300651cd21939486cdfaec6cc634b78f30ee91595d38c4301ea",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.0.3/ai-dict-0.0.3.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.0.2",
       "desc": "更新插件图标；修复自动更新(appcast)首次发布未生效的问题",
       "sha256": "20780cc389bfc0f788537716879d5b2068610891e1d88fe981ea3eb2bc99c6fc",
