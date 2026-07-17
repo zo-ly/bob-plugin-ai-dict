@@ -1,0 +1,67 @@
+{
+  "identifier": "com.zoly.bobplugin.aidict",
+  "version": "0.1.0",
+  "category": "translate",
+  "name": "AI Dict 翻译",
+  "summary": "LLM 翻译插件：句子正常翻译，单词返回真正的词典展示（音标 / 词性词义 / 变形 / 例句），支持自定义 Prompt 和任意 OpenAI 兼容接口。",
+  "author": "zoly",
+  "minBobVersion": "1.6.0",
+  "options": [
+    {
+      "identifier": "apiUrl",
+      "type": "text",
+      "title": "API 地址",
+      "defaultValue": "https://api.openai.com/v1/chat/completions",
+      "desc": "OpenAI 兼容的 Chat Completions 接口地址。DeepSeek: https://api.deepseek.com/chat/completions；本地 Ollama: http://localhost:11434/v1/chat/completions",
+      "textConfig": {
+        "type": "visible",
+        "placeholderText": "https://api.openai.com/v1/chat/completions"
+      }
+    },
+    {
+      "identifier": "apiKey",
+      "type": "text",
+      "title": "API Key",
+      "defaultValue": "",
+      "desc": "接口密钥。本地模型（Ollama 等）可留空。",
+      "textConfig": {
+        "type": "secure",
+        "placeholderText": "sk-xxxx"
+      }
+    },
+    {
+      "identifier": "model",
+      "type": "text",
+      "title": "模型",
+      "defaultValue": "gpt-4o-mini",
+      "textConfig": {
+        "type": "visible",
+        "placeholderText": "gpt-4o-mini / deepseek-chat / qwen2.5 ..."
+      }
+    },
+    {
+      "identifier": "dictPromptExtra",
+      "type": "text",
+      "title": "词典模式附加要求",
+      "defaultValue": "",
+      "desc": "追加到单词查询 Prompt 末尾的自定义要求，例如：例句偏向计算机领域 / additions 里加一条常见搭配。",
+      "textConfig": {
+        "type": "visible",
+        "height": "80",
+        "placeholderText": "例句偏向日常口语，additions 增加一条「常见搭配」"
+      }
+    },
+    {
+      "identifier": "translatePrompt",
+      "type": "text",
+      "title": "句子翻译 Prompt（可选）",
+      "defaultValue": "",
+      "desc": "留空使用内置翻译 Prompt。可用变量：$sourceLang、$targetLang、$text。",
+      "textConfig": {
+        "type": "visible",
+        "height": "80",
+        "placeholderText": "你是一名资深译者，请将下面的 $sourceLang 文本翻译成地道的 $targetLang ..."
+      }
+    }
+  ]
+}
