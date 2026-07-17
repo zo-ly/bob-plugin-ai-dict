@@ -76,8 +76,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet appcast.json; then
-            git add appcast.json
+          git add appcast.json
+          # 用 --cached 判断，兼容 appcast.json 首次发布时尚未被跟踪的情况
+          if ! git diff --cached --quiet; then
             git commit -m "🤖 chore: 更新 appcast.json (${{ steps.v.outputs.tag }})"
             git push origin main
           fi
