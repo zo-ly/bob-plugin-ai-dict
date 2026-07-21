@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.1.2",
+      "desc": "🔖 chore: 发布 0.1.2",
+      "sha256": "730679fa09b3ff1de051962b00a2303a008c72ec566c9f5efafa774529695ae2",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.1.2/ai-dict-0.1.2.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.1.1",
       "desc": "⚡ 词典卡片改流式输出，出结果更快",
       "sha256": "449a0fada4a3bd52b24255d8d6163cc3e3e2d786877d5b0ad1581fbaf6ed08f2",
