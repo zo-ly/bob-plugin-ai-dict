@@ -1,21 +1,22 @@
 name: Release
 
-# 推送 v* 标签时触发：打包 .bobplugin → 更新 appcast.json → 创建 GitHub Release。
+# 推送 v* 标签时触发：按该 tag 构建打包 → 创建 GitHub Release → 回填 appcast.json 到 main。
+# lint / 类型 / 测试 由 ci.yml 在 PR 与 main 提交时把关；tag 应从已过 CI 的 main 提交打出，故此处不再重复校验。
 on:
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: write # 允许提交 appcast.json 回 main、创建 Release
+  contents: write # 允许创建 Release、把 appcast.json 提交回 main
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # 默认检出 tag 指向的提交：构建/打包的就是这个 tag 本身，而非 main HEAD
       - uses: actions/checkout@v4
         with:
-          ref: main # 检出 main 分支以便把 appcast.json 提交回去
           fetch-depth: 0 # 拉全历史与标签，便于读取 tag message
 
       - name: 解析版本号
@@ -26,13 +27,16 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: 校验 info.json 版本与标签一致
+      - name: 校验版本一致并读取元信息（取自 tag 的 info.json）
+        id: meta
         run: |
           INFO_VERSION=$(jq -r .version info.json)
           if [ "$INFO_VERSION" != "${{ steps.v.outputs.version }}" ]; then
             echo "::error::info.json 版本 ($INFO_VERSION) 与标签 (${{ steps.v.outputs.version }}) 不一致"
             exit 1
           fi
+          echo "identifier=$(jq -r .identifier info.json)" >> "$GITHUB_OUTPUT"
+          echo "minBob=$(jq -r .minBobVersion info.json)" >> "$GITHUB_OUTPUT"
 
       - name: 读取发布说明（取自标签信息）
         id: desc
@@ -41,28 +45,59 @@ jobs:
           [ -z "$DESC" ] && DESC="Release ${{ steps.v.outputs.tag }}"
           echo "text=$DESC" >> "$GITHUB_OUTPUT"
 
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建 main.js
+        run: npm run build
+
       - name: 打包 .bobplugin
         id: pkg
         run: |
           FILE="ai-dict-${{ steps.v.outputs.version }}.bobplugin"
-          FILES=(info.json main.js)
+          FILES=(info.json dist/main.js)
           [ -f icon.png ] && FILES+=(icon.png)
           zip -j "$FILE" "${FILES[@]}"
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "$FILE" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
-      - name: 更新 appcast.json
+      # 先建 Release（上传产物），再回填 appcast —— 保证 appcast 里的下载 URL 指向的资源已存在
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.v.outputs.version }}"
-          TAG="${{ steps.v.outputs.tag }}"
-          SHA="${{ steps.pkg.outputs.sha256 }}"
-          FILE="${{ steps.pkg.outputs.file }}"
-          DESC="${{ steps.desc.outputs.text }}"
-          IDENTIFIER=$(jq -r .identifier info.json)
-          MINBOB=$(jq -r .minBobVersion info.json)
+          gh release create "${{ steps.v.outputs.tag }}" \
+            "${{ steps.pkg.outputs.file }}" \
+            --title "${{ steps.v.outputs.tag }}" \
+            --notes "${{ steps.desc.outputs.text }}"
+
+      # appcast.json 住在 main：单独把 main 检出到子目录，避免污染上面 tag 的工作区
+      - name: 检出 main（用于回填 appcast）
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-checkout
+
+      - name: 更新并提交 appcast.json 到 main
+        working-directory: main-checkout
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+          SHA: ${{ steps.pkg.outputs.sha256 }}
+          FILE: ${{ steps.pkg.outputs.file }}
+          DESC: ${{ steps.desc.outputs.text }}
+          IDENTIFIER: ${{ steps.meta.outputs.identifier }}
+          MINBOB: ${{ steps.meta.outputs.minBob }}
+        run: |
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${FILE}"
 
-          [ -f appcast.json ] || echo "{\"identifier\":\"$IDENTIFIER\",\"versions\":[]}" > appcast.json
+          [ -f appcast.json ] || echo "{\"identifier\":\"${IDENTIFIER}\",\"versions\":[]}" > appcast.json
 
           # 移除同版本旧条目后，把新版本插到最前面
           jq --arg v "$VERSION" --arg d "$DESC" --arg s "$SHA" --arg u "$URL" --arg m "$MINBOB" --arg id "$IDENTIFIER" '
@@ -72,22 +107,11 @@ jobs:
           ' appcast.json > appcast.tmp.json
           mv appcast.tmp.json appcast.json
 
-      - name: 提交 appcast.json 回 main
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add appcast.json
           # 用 --cached 判断，兼容 appcast.json 首次发布时尚未被跟踪的情况
           if ! git diff --cached --quiet; then
-            git commit -m "🤖 chore: 更新 appcast.json (${{ steps.v.outputs.tag }})"
+            git commit -m "🤖 chore: 更新 appcast.json (${TAG})"
             git push origin main
           fi
-
-      - name: 创建 GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ steps.v.outputs.tag }}" \
-            "${{ steps.pkg.outputs.file }}" \
-            --title "${{ steps.v.outputs.tag }}" \
-            --notes "${{ steps.desc.outputs.text }}"

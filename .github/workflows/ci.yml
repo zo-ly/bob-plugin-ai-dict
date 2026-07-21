@@ -1,0 +1,41 @@
+name: CI
+
+# 对 main 的 PR、以及 main 上的提交都跑校验（lint / 类型 / 测试 / 构建）。
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 同一 PR 有新提交时取消尚未跑完的旧任务，省 CI 时间；
+# main 上的提交不取消，保证每个 main 提交都有完整的 CI 结果。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 代码检查（Biome）
+        run: npm run lint
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 运行测试
+        run: npm test
+
+      - name: 构建（确认可编译打包）
+        run: npm run build

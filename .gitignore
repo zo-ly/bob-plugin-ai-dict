@@ -1,2 +1,6 @@
 *.bobplugin
 .DS_Store
+.claude
+node_modules/
+dist/
+*.tsbuildinfo

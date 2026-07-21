@@ -1,0 +1,23 @@
+{
+  "name": "bob-plugin-ai-dict",
+  "private": true,
+  "description": "AI Dict 翻译 — Bob 插件",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "test": "vitest run",
+    "build": "node scripts/build.mjs",
+    "package": "bash scripts/package.sh",
+    "package:dev": "bash scripts/package.sh dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
+    "@bob-translate/types": "^1.1.0",
+    "esbuild": "^0.28.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
