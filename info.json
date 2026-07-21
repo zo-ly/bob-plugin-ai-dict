@@ -1,6 +1,6 @@
 {
   "identifier": "com.zoly.bobplugin.aidict",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "category": "translate",
   "name": "AI Dict 翻译",
   "summary": "LLM 翻译插件：句子正常翻译，单词返回真正的词典展示（音标 / 词性词义 / 变形 / 例句），支持自定义 Prompt 和任意 OpenAI 兼容接口。",
