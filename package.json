@@ -3,7 +3,7 @@
   "private": true,
   "description": "AI Dict 翻译 — Bob 插件",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
