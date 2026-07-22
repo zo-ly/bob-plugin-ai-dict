@@ -112,6 +112,6 @@ jobs:
           git add appcast.json
           # 用 --cached 判断，兼容 appcast.json 首次发布时尚未被跟踪的情况
           if ! git diff --cached --quiet; then
-            git commit -m "🤖 chore: 更新 appcast.json (${TAG})"
+            git commit -m "🤖 chore: update appcast.json (${TAG})"
             git push origin main
           fi
