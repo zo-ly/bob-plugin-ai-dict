@@ -1,6 +1,9 @@
+import type { TtsResult } from '@bob-translate/types';
+
 export interface Phonetic {
   type: 'us' | 'uk';
   value: string;
+  tts?: TtsResult;
 }
 
 export interface Part {

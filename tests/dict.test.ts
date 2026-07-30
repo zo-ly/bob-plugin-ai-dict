@@ -23,6 +23,18 @@ describe('parseDictText', () => {
     expect(d.phonetics.map((p) => p.type)).toEqual(['us', 'uk']);
   });
 
+  it('attaches youdao tts url per phonetic type', () => {
+    expect(d.phonetics[0]?.tts).toEqual({ type: 'url', value: 'https://dict.youdao.com/dictvoice?audio=run&type=2' });
+    expect(d.phonetics[1]?.tts).toEqual({ type: 'url', value: 'https://dict.youdao.com/dictvoice?audio=run&type=1' });
+  });
+
+  it('builds tts url from the WORD line, url-encoded', () => {
+    const x = parseDictText("WORD: mother's day\nUS: ˈmʌðərz deɪ\nPOS: n. | 母亲节", 'mothers day')!;
+    expect(x.phonetics[0]?.tts?.value).toBe(
+      `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent("mother's day")}&type=2`,
+    );
+  });
+
   it('splits parts and means', () => {
     expect(d.parts).toHaveLength(2);
     expect(d.parts[0]).toEqual({ part: 'v.', means: ['跑', '经营', '运行'] });

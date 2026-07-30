@@ -12,6 +12,11 @@ describe('buildDictSystemPrompt', () => {
     expect(p).toContain('英语');
     expect(p).toContain('简体中文');
   });
+  it('pins phonetic conventions for US/UK', () => {
+    const p = buildDictSystemPrompt(q, '');
+    expect(p).toContain('GenAm');
+    expect(p).toContain('RP');
+  });
   it('appends extra requirement when provided', () => {
     expect(buildDictSystemPrompt(q, '例句偏计算机')).toContain('补充要求：例句偏计算机');
   });

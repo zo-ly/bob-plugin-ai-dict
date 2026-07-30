@@ -1,4 +1,13 @@
+import type { TtsResult } from '@bob-translate/types';
 import type { Addition, DictObject, Exchange, Part, Phonetic } from './types';
+
+// 有道发音接口：type 2 美音、1 英音
+function youdaoTts(word: string, type: 'us' | 'uk'): TtsResult {
+  return {
+    type: 'url',
+    value: `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=${type === 'us' ? 2 : 1}`,
+  };
+}
 
 // 单词/短语判定：≤3 个拉丁词（允许连字符、撇号）
 export function isDictQuery(text: string): boolean {
@@ -78,6 +87,10 @@ export function parseDictText(text: string, queryText: string): DictObject | nul
   }
 
   if (!parts.length) return null;
+  // 循环后才挂 tts：WORD 行可能改写原词
+  for (const p of phonetics) {
+    p.tts = youdaoTts(word, p.type);
+  }
   // ToDictObject 要求 phonetics 必填，为空也要带上
   const dict: DictObject = { word, parts, phonetics };
   if (exchanges.length) dict.exchanges = exchanges;
