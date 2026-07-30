@@ -41,6 +41,9 @@ jobs:
       - name: 读取发布说明（取自标签信息）
         id: desc
         run: |
+          # actions/checkout 会把注释标签覆写成指向 commit 的轻量标签（actions/checkout#290），
+          # 不强制重拉的话 %(contents:subject) 读到的是 commit message 而非 tag 注释
+          git fetch --force origin "refs/tags/${{ steps.v.outputs.tag }}:refs/tags/${{ steps.v.outputs.tag }}"
           DESC=$(git tag -l --format='%(contents:subject)' "${{ steps.v.outputs.tag }}")
           [ -z "$DESC" ] && DESC="Release ${{ steps.v.outputs.tag }}"
           echo "text=$DESC" >> "$GITHUB_OUTPUT"
