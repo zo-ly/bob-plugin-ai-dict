@@ -11,7 +11,8 @@
     "test": "vitest run",
     "build": "node scripts/build.mjs",
     "package": "bash scripts/package.sh",
-    "package:dev": "bash scripts/package.sh dev"
+    "package:dev": "bash scripts/package.sh dev",
+    "release": "bash scripts/release.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.4",
