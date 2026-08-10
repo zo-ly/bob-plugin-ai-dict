@@ -7,7 +7,7 @@ import type { ChatCompletion, ChatRequestBody, PluginOptions } from './types';
 // onCompletion / onStream 的载荷类型未导出，从函数签名推导。
 type CompletionPayload = Parameters<TextTranslateQuery['onCompletion']>[0];
 
-function getOptions(): PluginOptions {
+export function getOptions(): PluginOptions {
   // || 兜住空串，以走默认值
   return {
     apiUrl: ($option.apiUrl || '').trim() || 'https://api.openai.com/v1/chat/completions',
@@ -18,7 +18,7 @@ function getOptions(): PluginOptions {
   };
 }
 
-function parseData(raw: HttpResponse['data']): ChatCompletion | null {
+export function parseData(raw: HttpResponse['data']): ChatCompletion | null {
   let data: unknown = raw;
   if (typeof data === 'string') {
     try {
@@ -30,7 +30,7 @@ function parseData(raw: HttpResponse['data']): ChatCompletion | null {
   return data && typeof data === 'object' ? (data as ChatCompletion) : null;
 }
 
-function apiMessageOf(data: ChatCompletion | null, statusCode: number): string {
+export function apiMessageOf(data: ChatCompletion | null, statusCode: number): string {
   const errVal = data?.error;
   const msg = errVal && (typeof errVal === 'string' ? errVal : errVal.message);
   return msg || `HTTP ${statusCode}`;
