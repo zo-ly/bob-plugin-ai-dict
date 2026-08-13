@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.1.5",
+      "desc": "新增中文查词：输入中文词或成语，直接给出英文对应词的音标、释义和例句",
+      "sha256": "a7db8a979c2f7175d206859e969fb3eda6cbe99da1090c612c2354a85fa9dd35",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.1.5/ai-dict-0.1.5.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.1.4",
       "desc": "设置页新增「验证服务」按钮，一键校验 API 地址 / Key / 模型配置",
       "sha256": "f655e946f17222b1519f6dbd18b29743d00ca6512f1118495cff1d6693366365",
