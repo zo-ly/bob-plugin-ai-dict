@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dictPreviewParagraphs, isDictQuery, parseDictText } from '../src/dict';
+import { dictPreviewParagraphs, isCjkDictQuery, isDictQuery, parseDictText } from '../src/dict';
 
 const sample = [
   'WORD: run',
@@ -51,6 +51,11 @@ describe('parseDictText', () => {
 
   it('maps NOTE to 记忆提示', () => expect(d.additions?.[1]?.name).toBe('记忆提示'));
 
+  it('maps ALT to 其他译法', () => {
+    const x = parseDictText('WORD: happy\nPOS: adj. | 高兴的\nALT: glad, pleased', '高兴')!;
+    expect(x.additions).toContainEqual({ name: '其他译法', value: 'glad, pleased' });
+  });
+
   it('returns null when no parts', () => expect(parseDictText('WORD: foo\nUK: fu', 'foo')).toBeNull());
 
   it('handles POS without pipe (means only)', () => {
@@ -72,6 +77,12 @@ describe('dictPreviewParagraphs', () => {
     expect(prev).toContain('英 /rʌn/');
   });
   it('prefixes NOTE with a bulb', () => expect(prev.some((l) => l.startsWith('💡'))).toBe(true));
+  it('prefixes ALT with 又译', () => {
+    expect(dictPreviewParagraphs('ALT: glad, pleased')).toEqual(['又译 glad, pleased']);
+  });
+  it('keeps the whole line for unknown colon lines (plain translation fallback)', () => {
+    expect(dictPreviewParagraphs('He said: hello')).toEqual(['He said: hello']);
+  });
 });
 
 describe('isDictQuery', () => {
@@ -82,4 +93,23 @@ describe('isDictQuery', () => {
   });
   it('rejects full sentences', () => expect(isDictQuery('this is a whole sentence to translate')).toBe(false));
   it('rejects non-latin input', () => expect(isDictQuery('你好')).toBe(false));
+});
+
+describe('isCjkDictQuery', () => {
+  it('accepts all-han words up to 10 chars', () => {
+    expect(isCjkDictQuery('星期六')).toBe(true);
+    expect(isCjkDictQuery('高兴')).toBe(true);
+    expect(isCjkDictQuery('一心一意')).toBe(true);
+    expect(isCjkDictQuery('一言既出驷马难追')).toBe(true);
+  });
+  it('rejects text longer than 10 chars', () => {
+    expect(isCjkDictQuery('这是一个需要翻译的完整句子')).toBe(false);
+  });
+  it('rejects punctuation, spaces, and mixed scripts', () => {
+    expect(isCjkDictQuery('你好，世界')).toBe(false);
+    expect(isCjkDictQuery('星期 六')).toBe(false);
+    expect(isCjkDictQuery('周six')).toBe(false);
+    expect(isCjkDictQuery('Saturday')).toBe(false);
+  });
+  it('rejects empty input', () => expect(isCjkDictQuery('  ')).toBe(false));
 });

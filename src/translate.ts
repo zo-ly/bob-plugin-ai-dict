@@ -1,6 +1,6 @@
 import type { HttpResponse, TextTranslate, TextTranslateQuery, TextTranslateResult } from '@bob-translate/types';
-import { dictPreviewParagraphs, isDictQuery, parseDictText, textToParagraphs } from './dict';
-import { buildDictSystemPrompt, buildTranslateSystemPrompt } from './prompt';
+import { dictPreviewParagraphs, isCjkDictQuery, isDictQuery, parseDictText, textToParagraphs } from './dict';
+import { buildDictSystemPrompt, buildReverseDictSystemPrompt, buildTranslateSystemPrompt } from './prompt';
 import { createOpenAiSseParser } from './sse';
 import type { ChatCompletion, ChatRequestBody, PluginOptions } from './types';
 
@@ -58,10 +58,15 @@ export const translate: TextTranslate = (query, completion) => {
     return;
   }
 
-  const dictMode = isDictQuery(query.text);
-  const systemPrompt = dictMode
+  const forwardDict = isDictQuery(query.text);
+  // 反向词典（中文词查英文）仅在目标为英文时启用：US/UK 音标、有道 TTS 都是英文专属
+  const reverseDict = !forwardDict && query.detectTo === 'en' && isCjkDictQuery(query.text);
+  const dictMode = forwardDict || reverseDict;
+  const systemPrompt = forwardDict
     ? buildDictSystemPrompt(query, dictPromptExtra)
-    : buildTranslateSystemPrompt(query, translatePrompt);
+    : reverseDict
+      ? buildReverseDictSystemPrompt(query, dictPromptExtra)
+      : buildTranslateSystemPrompt(query, translatePrompt);
 
   const header: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) {

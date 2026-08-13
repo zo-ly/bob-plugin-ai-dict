@@ -18,6 +18,14 @@ export function isDictQuery(text: string): boolean {
   return /^[A-Za-z][A-Za-z\-'’]*(\s+[A-Za-z][A-Za-z\-'’]*)*$/.test(t);
 }
 
+// 中文词典候选门：宽松初筛，全汉字且 ≤10 字（成语/专业词进得来，长句进不来）。
+// 是词还是短句由模型终判：词吐字段格式，句吐纯译文（解析失败自动落段落展示）。
+export function isCjkDictQuery(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 10) return false;
+  return /^\p{Script=Han}+$/u.test(t);
+}
+
 export function stripSlashes(s: string): string {
   return (s || '').replace(/^\/+|\/+$/g, '').trim();
 }
@@ -81,6 +89,9 @@ export function parseDictText(text: string, queryText: string): DictObject | nul
       case 'NOTE':
         additions.push({ name: '记忆提示', value: val });
         break;
+      case 'ALT':
+        additions.push({ name: '其他译法', value: val });
+        break;
       default:
         break;
     }
@@ -133,8 +144,12 @@ export function dictPreviewParagraphs(text: string): string[] {
       case 'NOTE':
         out.push(`💡 ${val}`);
         break;
+      case 'ALT':
+        out.push(`又译 ${val}`);
+        break;
       default:
-        out.push(val || line);
+        // 非已知标签的冒号行是正文（如模型判为句子后输出的纯译文），保留整行
+        out.push(line);
     }
   }
   return out.length ? out : [text || ''];

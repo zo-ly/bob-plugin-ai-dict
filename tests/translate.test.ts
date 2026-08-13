@@ -221,6 +221,65 @@ describe('fallback matrix', () => {
   });
 });
 
+describe('reverse dict (中文查英文)', () => {
+  it('short chinese word + detectTo en → reverse dict prompt with dict max_tokens; dict output parses to a card', () => {
+    let final: Cfg = null;
+    onStreamReq = (cfg) => {
+      expect(cfg.body.messages[0].content).toContain('汉英词典');
+      expect(cfg.body.max_tokens).toBe(700);
+      cfg.streamHandler({ text: sse('WORD: Saturday\nUS: ˈsætərdeɪ\nPOS: n. | 星期六\nALT: Sat.') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    translate(
+      mkQuery({
+        text: '星期六',
+        detectFrom: 'zh-Hans',
+        detectTo: 'en',
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.result.toDict.word).toBe('Saturday');
+    expect(final.result.toDict.phonetics[0].tts.value).toContain('Saturday');
+    expect(final.result.toDict.additions[0]).toEqual({ name: '其他译法', value: 'Sat.' });
+  });
+
+  it('model judges input as a sentence (plain text) → falls back to paragraphs', () => {
+    let final: Cfg = null;
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({ text: sse('I love you.') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    translate(
+      mkQuery({
+        text: '我爱你',
+        detectFrom: 'zh-Hans',
+        detectTo: 'en',
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.result.toDict).toBeUndefined();
+    expect(final.result.toParagraphs).toEqual(['I love you.']);
+  });
+
+  it('chinese word but detectTo is not en → plain translate prompt, no max_tokens', () => {
+    onStreamReq = (cfg) => {
+      expect(cfg.body.messages[0].content).toContain('翻译引擎');
+      expect(cfg.body.max_tokens).toBeUndefined();
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    onRequest = (cfg) => {
+      cfg.handler({ response: { statusCode: 200 }, data: { choices: [{ message: { content: '土曜日' } }] } });
+    };
+    translate(mkQuery({ text: '星期六', detectFrom: 'zh-Hans', detectTo: 'ja' }), () => {});
+  });
+});
+
 describe('compatibility & config', () => {
   it('old Bob without streamRequest → blocking path for a sentence', () => {
     stubHttp(false);
