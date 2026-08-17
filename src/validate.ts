@@ -1,5 +1,5 @@
 import type { HttpResponse, PluginValidate, ValidationCompletion } from '@bob-translate/types';
-import { apiMessageOf, getOptions, parseData } from './translate';
+import { apiMessageOf, emptyContentMessage, getOptions, isSiliconFlowApiUrl, parseData } from './translate';
 
 type ValidationResult = Parameters<ValidationCompletion>[0];
 
@@ -21,6 +21,17 @@ export function validationOf(resp: HttpResponse): ValidationResult {
       error: {
         type: statusCode === 401 ? 'secretKey' : 'api',
         message: `接口返回错误：${apiMessageOf(data, statusCode)}`,
+        addition: '',
+      },
+    };
+  }
+  const content = data.choices[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    return {
+      result: false,
+      error: {
+        type: 'api',
+        message: `接口返回错误：${emptyContentMessage(data)}`,
         addition: '',
       },
     };
@@ -55,6 +66,7 @@ export const pluginValidate: PluginValidate = (completion) => {
       temperature: 0,
       stream: false,
       max_tokens: 8,
+      ...(isSiliconFlowApiUrl(apiUrl) ? { enable_thinking: false } : {}),
       messages: [{ role: 'user', content: 'ping' }],
     },
     handler(resp) {

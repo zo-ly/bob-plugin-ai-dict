@@ -24,11 +24,15 @@ Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/o
 
 | 选项 | 说明 |
 |------|------|
-| API 地址 | OpenAI 兼容接口。DeepSeek：`https://api.deepseek.com/chat/completions`；Ollama：`http://localhost:11434/v1/chat/completions` |
+| API 地址 | OpenAI 兼容接口。DeepSeek：`https://api.deepseek.com/chat/completions`；SiliconFlow：`https://api.siliconflow.cn/v1/chat/completions`；Ollama：`http://localhost:11434/v1/chat/completions` |
 | API Key | 密钥；本地模型可留空 |
 | 模型 | `gpt-4o-mini` / `deepseek-chat` / `qwen2.5` 等 |
 | 词典模式附加要求 | 追加到单词 Prompt 末尾，如"例句偏向计算机领域" |
 | 句子翻译 Prompt | 留空用内置；支持 `$sourceLang` `$targetLang` `$text` 变量 |
+
+使用 SiliconFlow 时，插件会自动关闭模型的思考模式，避免词典模式的输出额度被
+`reasoning_content` 占满而没有可展示的正文。对于不能关闭思考模式的模型，建议改用名称带
+`Instruct` 的模型。
 
 ## 开发
 

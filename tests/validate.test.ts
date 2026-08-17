@@ -39,4 +39,19 @@ describe('validationOf', () => {
     expect(r.error?.type).toBe('api');
     expect(r.error?.message).toContain('HTTP 200');
   });
+
+  it('rejects choices whose message.content is empty', () => {
+    const r = validationOf(resp({ data: { choices: [{ message: { content: '' } }] }, statusCode: 200 }));
+    expect(r.result).toBe(false);
+    expect(r.error?.message).toContain('message.content 为空');
+  });
+
+  it('explains reasoning-only responses from thinking models', () => {
+    const r = validationOf(
+      resp({ data: { choices: [{ message: { content: '', reasoning_content: 'thinking' } }] }, statusCode: 200 }),
+    );
+    expect(r.result).toBe(false);
+    expect(r.error?.message).toContain('reasoning_content');
+    expect(r.error?.message).toContain('Instruct');
+  });
 });

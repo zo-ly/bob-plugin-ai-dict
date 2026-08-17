@@ -3,6 +3,7 @@
 
 export interface SseParseResult {
   deltas: string[];
+  reasoningDeltas: string[];
   error: { message?: string } | null;
 }
 
@@ -12,6 +13,7 @@ export function createOpenAiSseParser(): { push(chunk: string): SseParseResult }
   return {
     push(chunk: string): SseParseResult {
       const deltas: string[] = [];
+      const reasoningDeltas: string[] = [];
       let error: { message?: string } | null = null;
 
       buffer += chunk;
@@ -24,7 +26,10 @@ export function createOpenAiSseParser(): { push(chunk: string): SseParseResult }
         if (!m) continue;
         const payload = m[1];
         if (!payload || payload === '[DONE]') continue;
-        let obj: { error?: { message?: string }; choices?: Array<{ delta?: { content?: string } }> };
+        let obj: {
+          error?: { message?: string };
+          choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>;
+        };
         try {
           obj = JSON.parse(payload);
         } catch {
@@ -39,9 +44,13 @@ export function createOpenAiSseParser(): { push(chunk: string): SseParseResult }
         if (typeof delta === 'string' && delta) {
           deltas.push(delta);
         }
+        const reasoningDelta = choice?.delta?.reasoning_content;
+        if (typeof reasoningDelta === 'string' && reasoningDelta) {
+          reasoningDeltas.push(reasoningDelta);
+        }
       }
 
-      return { deltas, error };
+      return { deltas, reasoningDeltas, error };
     },
   };
 }

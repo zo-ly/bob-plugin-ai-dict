@@ -49,11 +49,12 @@ export interface ChatRequestBody {
   stream: boolean;
   messages: ChatMessage[];
   max_tokens?: number;
+  enable_thinking?: boolean;
 }
 
 export interface ChatCompletionChoice {
-  message?: { content?: string };
-  delta?: { content?: string };
+  message?: { content?: string; reasoning_content?: string };
+  delta?: { content?: string; reasoning_content?: string };
 }
 
 export interface ChatCompletion {

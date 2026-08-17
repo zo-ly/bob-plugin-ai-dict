@@ -281,6 +281,42 @@ describe('reverse dict (中文查英文)', () => {
 });
 
 describe('compatibility & config', () => {
+  it('disables thinking for SiliconFlow requests', () => {
+    vi.stubGlobal('$option', {
+      apiKey: 'sk-test',
+      apiUrl: 'https://api.siliconflow.cn/v1/chat/completions',
+      model: 'Qwen/Qwen3-8B',
+    });
+    onStreamReq = (cfg) => {
+      expect(cfg.body.enable_thinking).toBe(false);
+      cfg.streamHandler({ text: sse('WORD: run\nPOS: v. | 跑') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    translate(mkQuery(), () => {});
+  });
+
+  it('surfaces an error when blocking response contains reasoning but no content', () => {
+    stubHttp(false);
+    let final: Cfg = null;
+    onRequest = (cfg) => {
+      cfg.handler({
+        response: { statusCode: 200 },
+        data: { choices: [{ message: { content: '', reasoning_content: 'thinking' } }] },
+      });
+    };
+    translate(
+      mkQuery({
+        onStream: undefined,
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.error.type).toBe('api');
+    expect(final.error.message).toContain('reasoning_content');
+  });
+
   it('old Bob without streamRequest → blocking path for a sentence', () => {
     stubHttp(false);
     let blocking = false;

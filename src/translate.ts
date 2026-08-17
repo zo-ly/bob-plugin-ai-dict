@@ -36,6 +36,18 @@ export function apiMessageOf(data: ChatCompletion | null, statusCode: number): s
   return msg || `HTTP ${statusCode}`;
 }
 
+export function isSiliconFlowApiUrl(apiUrl: string): boolean {
+  return /^https:\/\/api\.siliconflow\.cn(?:\/|$)/i.test(apiUrl);
+}
+
+export function emptyContentMessage(data: ChatCompletion | null): string {
+  const hasReasoning = data?.choices?.some((choice) => Boolean(choice.message?.reasoning_content?.trim()));
+  if (hasReasoning) {
+    return '模型只返回了 reasoning_content，没有返回正文 content；请关闭思考模式或改用 Instruct 模型';
+  }
+  return '接口请求成功，但模型返回的 message.content 为空';
+}
+
 export const translate: TextTranslate = (query, completion) => {
   let finished = false;
   function emitCompletion(payload: CompletionPayload): void {
@@ -88,6 +100,9 @@ export const translate: TextTranslate = (query, completion) => {
     };
     // 词典加 max_tokens 上限防超长；句子不限长避免截断
     if (dictMode) body.max_tokens = 700;
+    // SiliconFlow 的部分 Qwen/DeepSeek 模型默认开启思考模式，有限的词典输出额度可能全部耗在
+    // reasoning_content，导致 Bob 没有可展示的正文。翻译场景不需要思考过程，统一关闭。
+    if (isSiliconFlowApiUrl(apiUrl)) body.enable_thinking = false;
     return body;
   }
 
@@ -148,6 +163,10 @@ export const translate: TextTranslate = (query, completion) => {
         }
         const first = data.choices[0];
         const content = first?.message?.content || '';
+        if (!content.trim()) {
+          emitCompletion(apiError(statusCode, emptyContentMessage(data)));
+          return;
+        }
         emitCompletion({ result: buildResult(content) });
       },
     });
