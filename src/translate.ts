@@ -38,8 +38,7 @@ export function apiMessageOf(data: ChatCompletion | null, statusCode: number): s
 
 // 思考模型（Qwen3 默认思考模式、DeepSeek-R1 等）可能把输出额度全耗在思考上，
 // 只返回 reasoning_content 没有正文。翻译场景推理无益（arXiv:2602.14763），引导换模型而非加开关。
-const reasoningOnlyMessage =
-  '模型只返回了 reasoning_content，没有返回正文 content；请改用非思考模型（如名称带 Instruct 的型号）';
+const reasoningOnlyMessage = '输出额度被思考过程（reasoning_content）耗尽，没有返回正文，请改用非思考模型';
 
 export function emptyContentMessage(data: ChatCompletion | null): string {
   const hasReasoning = data?.choices?.some((choice) => Boolean(choice.message?.reasoning_content?.trim()));
