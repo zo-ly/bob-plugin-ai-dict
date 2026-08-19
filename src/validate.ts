@@ -25,19 +25,20 @@ export function validationOf(resp: HttpResponse): ValidationResult {
       },
     };
   }
-  // 空正文不算验证通过：思考模型可能只返回 reasoning_content，翻译时会一直空白
-  const content = data.choices[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    return {
-      result: false,
-      error: {
-        type: 'api',
-        message: `接口返回错误：${emptyContentMessage(data)}`,
-        addition: '',
-      },
-    };
-  }
-  return { result: true };
+  // 验证只管连通性：探针 max_tokens 很小，思考模型的正文额度必然被 reasoning 吃光，
+  // 但返回了 reasoning_content 同样证明 URL/Key/模型有效，放行；两者皆空才算异常
+  const message = data.choices[0]?.message;
+  const content = message?.content;
+  if (typeof content === 'string' && content.trim()) return { result: true };
+  if (message?.reasoning_content?.trim()) return { result: true };
+  return {
+    result: false,
+    error: {
+      type: 'api',
+      message: `接口返回错误：${emptyContentMessage(data)}`,
+      addition: '',
+    },
+  };
 }
 
 // 设置页「验证服务」按钮：发一次最小的非流式 chat 请求，校验 API 地址 / Key / 模型是否可用

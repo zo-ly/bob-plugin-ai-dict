@@ -46,11 +46,10 @@ describe('validationOf', () => {
     expect(r.error?.message).toContain('message.content 为空');
   });
 
-  it('explains reasoning-only responses from thinking models', () => {
+  it('passes reasoning-only responses: they prove url/key/model are all valid', () => {
     const r = validationOf(
       resp({ data: { choices: [{ message: { content: '', reasoning_content: 'thinking' } }] }, statusCode: 200 }),
     );
-    expect(r.result).toBe(false);
-    expect(r.error?.message).toContain('非思考模型');
+    expect(r).toEqual({ result: true });
   });
 });
