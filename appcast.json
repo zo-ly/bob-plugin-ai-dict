@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.1.6",
+      "desc": "思考模型返回空内容时不再静默空白，明确报错并提示改用非思考模型",
+      "sha256": "24c1701a9830c13e4e8baef388248d2dfb0167b7661ede7ff673099ad12ac866",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.1.6/ai-dict-0.1.6.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.1.5",
       "desc": "新增中文查词：输入中文词或成语，直接给出英文对应词的音标、释义和例句",
       "sha256": "a7db8a979c2f7175d206859e969fb3eda6cbe99da1090c612c2354a85fa9dd35",
