@@ -96,8 +96,8 @@ export const translate: TextTranslate = (query, completion) => {
         { role: 'user', content: query.text },
       ],
     };
-    // 词典加 max_tokens 上限防超长；句子不限长避免截断
-    if (dictMode) body.max_tokens = 700;
+    // 不传 max_tokens：交给服务端默认上限。避免思考模型（额度被 reasoning 吃光）和
+    // OpenAI 新模型（拒收 max_tokens、要求 max_completion_tokens）两类兼容性问题
     return body;
   }
 

@@ -290,11 +290,11 @@ describe('thinking models (reasoning-only responses)', () => {
 });
 
 describe('reverse dict (中文查英文)', () => {
-  it('short chinese word + detectTo en → reverse dict prompt with dict max_tokens; dict output parses to a card', () => {
+  it('short chinese word + detectTo en → reverse dict prompt; dict output parses to a card', () => {
     let final: Cfg = null;
     onStreamReq = (cfg) => {
       expect(cfg.body.messages[0].content).toContain('汉英词典');
-      expect(cfg.body.max_tokens).toBe(700);
+      expect(cfg.body.max_tokens).toBeUndefined();
       cfg.streamHandler({ text: sse('WORD: Saturday\nUS: ˈsætərdeɪ\nPOS: n. | 星期六\nALT: Sat.') });
       cfg.handler({ response: { statusCode: 200 }, data: '' });
     };

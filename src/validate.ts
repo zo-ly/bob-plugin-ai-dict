@@ -25,8 +25,8 @@ export function validationOf(resp: HttpResponse): ValidationResult {
       },
     };
   }
-  // 验证只管连通性：探针 max_tokens 很小，思考模型的正文额度必然被 reasoning 吃光，
-  // 但返回了 reasoning_content 同样证明 URL/Key/模型有效，放行；两者皆空才算异常
+  // 验证只管连通性：思考模型可能被服务端输出上限截在思考阶段、只回 reasoning_content，
+  // 但这同样证明 URL/Key/模型有效，放行；content 与 reasoning_content 皆空才算异常
   const message = data.choices[0]?.message;
   const content = message?.content;
   if (typeof content === 'string' && content.trim()) return { result: true };
@@ -67,7 +67,6 @@ export const pluginValidate: PluginValidate = (completion) => {
       model,
       temperature: 0,
       stream: false,
-      max_tokens: 8,
       messages: [{ role: 'user', content: 'ping' }],
     },
     handler(resp) {

@@ -48,7 +48,6 @@ export interface ChatRequestBody {
   temperature: number;
   stream: boolean;
   messages: ChatMessage[];
-  max_tokens?: number;
 }
 
 export interface ChatCompletionChoice {
