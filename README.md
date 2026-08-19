@@ -8,8 +8,6 @@ Bob 翻译插件：**句子正常翻译，单词/短语返回 Bob 原生词典�
 |:---:|:---:|:---:|
 | <img src="screenshots/dict-mode.png" width="300" alt="查单词：音标、词性词义、复数变形、例句、记忆提示"> | <img src="screenshots/abbr-mode.png" width="300" alt="查 YAGNI：有道音译成雅格尼、DeepSeek 原样返回，AI Dict 给出词义解释和记忆提示"> | <img src="screenshots/sentence-mode.png" width="300" alt="翻译整句：与其他 AI 服务一致的普通译文"> |
 
-查单词时展示音标（美/英）、词性词义、变形（可点击跳查）、例句和词根记忆提示；YAGNI 这类传统词典查不到的缩写和术语也能给出靠谱解释（中图里有道音译成了「雅格尼」）；整句输入自动切回普通翻译模式。
-
 ## 原理
 
 Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/object/translateresult.html) 结构时才渲染。本插件判断输入是单词/短语（≤3 个拉丁词）还是整句：单词让 LLM 输出紧凑的「每行一个字段」文本再解析成 `toDict`，整句走普通翻译填 `toParagraphs`。两条路径都流式输出、边生成边预览；解析失败或老版本 Bob 自动回退为纯文本 / 非流式。
@@ -24,13 +22,13 @@ Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/o
 
 | 选项 | 说明 |
 |------|------|
-| API 地址 | OpenAI 兼容接口。DeepSeek：`https://api.deepseek.com/chat/completions`；SiliconFlow：`https://api.siliconflow.cn/v1/chat/completions`；Ollama：`http://localhost:11434/v1/chat/completions` |
+| API 地址 | OpenAI 兼容接口。OpenAI：`https://api.openai.com/v1/chat/completions`；DeepSeek：`https://api.deepseek.com/chat/completions`；Grok：`https://api.x.ai/v1/chat/completions` |
 | API Key | 密钥；本地模型可留空 |
-| 模型 | `gpt-4o-mini` / `deepseek-chat` / `qwen2.5` 等 |
+| 模型 | `gpt-4o-mini` / `deepseek-chat` / `grok-4-fast-non-reasoning` 等 |
 | 词典模式附加要求 | 追加到单词 Prompt 末尾，如"例句偏向计算机领域" |
 | 句子翻译 Prompt | 留空用内置；支持 `$sourceLang` `$targetLang` `$text` 变量 |
 
-模型优先选用**非思考模型**（如名称带 `Instruct` 的型号）：对翻译类任务，开启推理并不能提升质量
+模型优先选用**非思考模型**：对翻译类任务，开启推理并不能提升质量
 （[arXiv:2602.14763](https://arxiv.org/abs/2602.14763)），只会更慢更贵。插件不限制输出长度
 （不传 `max_tokens`），思考模型（Qwen3 默认思考模式、deepseek-v4-flash 等）也能出结果，只是需要
 等待思考完成；若服务端的默认输出上限被思考过程占满、没有返回正文，插件会给出明确报错。
