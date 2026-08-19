@@ -221,6 +221,74 @@ describe('fallback matrix', () => {
   });
 });
 
+describe('thinking models (reasoning-only responses)', () => {
+  it('stream with only reasoning deltas → direct error, no blocking retry', () => {
+    let blocking = false;
+    let final: Cfg = null;
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({
+        text: `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'thinking...' } }] })}\n\n`,
+      });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    onRequest = () => {
+      blocking = true;
+    };
+    translate(
+      mkQuery({
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(blocking).toBe(false);
+    expect(final.error.type).toBe('api');
+    expect(final.error.message).toContain('非思考模型');
+  });
+
+  it('blocking response with reasoning but empty content → actionable error', () => {
+    stubHttp(false);
+    let final: Cfg = null;
+    onRequest = (cfg) => {
+      cfg.handler({
+        response: { statusCode: 200 },
+        data: { choices: [{ message: { content: '', reasoning_content: 'thinking' } }] },
+      });
+    };
+    translate(
+      mkQuery({
+        onStream: undefined,
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.error.type).toBe('api');
+    expect(final.error.message).toContain('reasoning_content');
+  });
+
+  it('blocking response with empty content and no reasoning → generic empty error', () => {
+    stubHttp(false);
+    let final: Cfg = null;
+    onRequest = (cfg) => {
+      cfg.handler({ response: { statusCode: 200 }, data: { choices: [{ message: { content: '' } }] } });
+    };
+    translate(
+      mkQuery({
+        onStream: undefined,
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.error.type).toBe('api');
+    expect(final.error.message).toContain('message.content 为空');
+  });
+});
+
 describe('reverse dict (中文查英文)', () => {
   it('short chinese word + detectTo en → reverse dict prompt with dict max_tokens; dict output parses to a card', () => {
     let final: Cfg = null;

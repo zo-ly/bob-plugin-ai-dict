@@ -52,8 +52,8 @@ export interface ChatRequestBody {
 }
 
 export interface ChatCompletionChoice {
-  message?: { content?: string };
-  delta?: { content?: string };
+  message?: { content?: string; reasoning_content?: string };
+  delta?: { content?: string; reasoning_content?: string };
 }
 
 export interface ChatCompletion {

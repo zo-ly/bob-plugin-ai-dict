@@ -36,6 +36,16 @@ export function apiMessageOf(data: ChatCompletion | null, statusCode: number): s
   return msg || `HTTP ${statusCode}`;
 }
 
+// 思考模型（Qwen3 默认思考模式、DeepSeek-R1 等）可能把输出额度全耗在思考上，
+// 只返回 reasoning_content 没有正文。翻译场景推理无益（arXiv:2602.14763），引导换模型而非加开关。
+const reasoningOnlyMessage =
+  '模型只返回了 reasoning_content，没有返回正文 content；请改用非思考模型（如名称带 Instruct 的型号）';
+
+export function emptyContentMessage(data: ChatCompletion | null): string {
+  const hasReasoning = data?.choices?.some((choice) => Boolean(choice.message?.reasoning_content?.trim()));
+  return hasReasoning ? reasoningOnlyMessage : '接口请求成功，但模型返回的 message.content 为空';
+}
+
 export const translate: TextTranslate = (query, completion) => {
   let finished = false;
   function emitCompletion(payload: CompletionPayload): void {
@@ -148,6 +158,10 @@ export const translate: TextTranslate = (query, completion) => {
         }
         const first = data.choices[0];
         const content = first?.message?.content || '';
+        if (!content.trim()) {
+          emitCompletion(apiError(statusCode, emptyContentMessage(data)));
+          return;
+        }
         emitCompletion({ result: buildResult(content) });
       },
     });
@@ -155,6 +169,7 @@ export const translate: TextTranslate = (query, completion) => {
 
   function runStream(): void {
     let targetText = '';
+    let sawReasoning = false;
     let streamError: { message?: string } | null = null;
     const parser = createOpenAiSseParser();
 
@@ -167,8 +182,9 @@ export const translate: TextTranslate = (query, completion) => {
       body: buildBody(true),
       streamHandler(stream) {
         if (!stream?.text) return;
-        const { deltas, error } = parser.push(stream.text);
+        const { deltas, reasoningDeltas, error } = parser.push(stream.text);
         if (error) streamError = error;
+        if (reasoningDeltas.length) sawReasoning = true;
         for (const delta of deltas) {
           targetText += delta;
           query.onStream({
@@ -197,6 +213,11 @@ export const translate: TextTranslate = (query, completion) => {
           return;
         }
         const statusCode = resp?.response?.statusCode || 0;
+        // 只收到思考增量、没有正文：非流式重试只会同样空（还多烧一遍思考 token），直接报错
+        if (sawReasoning) {
+          emitCompletion(apiError(statusCode, reasoningOnlyMessage));
+          return;
+        }
         // 鉴权无意义、限流避免打爆：不重试
         if (statusCode === 401 || statusCode === 429) {
           emitCompletion(apiError(statusCode, apiMessageOf(parseData(resp.data), statusCode)));

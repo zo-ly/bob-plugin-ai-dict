@@ -25,6 +25,14 @@ describe('createOpenAiSseParser', () => {
     expect(r.deltas).toEqual([]);
   });
 
+  it('separates reasoning_content deltas from displayable content', () => {
+    const parser = createOpenAiSseParser();
+    const reasoning = `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'thinking' } }] })}\n\n`;
+    const r = parser.push(`${reasoning}${sse('answer')}`);
+    expect(r.reasoningDeltas).toEqual(['thinking']);
+    expect(r.deltas).toEqual(['answer']);
+  });
+
   it('skips malformed JSON lines but keeps valid deltas', () => {
     const parser = createOpenAiSseParser();
     const r = parser.push(`data: {not json}\n\n${sse('ok')}`);

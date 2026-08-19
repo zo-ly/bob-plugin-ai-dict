@@ -24,11 +24,15 @@ Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/o
 
 | 选项 | 说明 |
 |------|------|
-| API 地址 | OpenAI 兼容接口。DeepSeek：`https://api.deepseek.com/chat/completions`；Ollama：`http://localhost:11434/v1/chat/completions` |
+| API 地址 | OpenAI 兼容接口。DeepSeek：`https://api.deepseek.com/chat/completions`；SiliconFlow：`https://api.siliconflow.cn/v1/chat/completions`；Ollama：`http://localhost:11434/v1/chat/completions` |
 | API Key | 密钥；本地模型可留空 |
 | 模型 | `gpt-4o-mini` / `deepseek-chat` / `qwen2.5` 等 |
 | 词典模式附加要求 | 追加到单词 Prompt 末尾，如"例句偏向计算机领域" |
 | 句子翻译 Prompt | 留空用内置；支持 `$sourceLang` `$targetLang` `$text` 变量 |
+
+模型请选用**非思考模型**（如名称带 `Instruct` 的型号）。思考模型（Qwen3 默认思考模式、DeepSeek-R1 等）
+会先输出思考过程，词典模式的输出额度可能被占满而没有正文；且对翻译类任务，开启推理并不能提升质量
+（[arXiv:2602.14763](https://arxiv.org/abs/2602.14763)）。遇到这种情况插件会给出明确报错。
 
 ## 开发
 

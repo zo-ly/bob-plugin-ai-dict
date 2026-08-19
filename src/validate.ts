@@ -1,5 +1,5 @@
 import type { HttpResponse, PluginValidate, ValidationCompletion } from '@bob-translate/types';
-import { apiMessageOf, getOptions, parseData } from './translate';
+import { apiMessageOf, emptyContentMessage, getOptions, parseData } from './translate';
 
 type ValidationResult = Parameters<ValidationCompletion>[0];
 
@@ -21,6 +21,18 @@ export function validationOf(resp: HttpResponse): ValidationResult {
       error: {
         type: statusCode === 401 ? 'secretKey' : 'api',
         message: `接口返回错误：${apiMessageOf(data, statusCode)}`,
+        addition: '',
+      },
+    };
+  }
+  // 空正文不算验证通过：思考模型可能只返回 reasoning_content，翻译时会一直空白
+  const content = data.choices[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    return {
+      result: false,
+      error: {
+        type: 'api',
+        message: `接口返回错误：${emptyContentMessage(data)}`,
         addition: '',
       },
     };
