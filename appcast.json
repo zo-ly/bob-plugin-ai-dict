@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.1.7",
+      "desc": "移除 max_tokens 限制，思考模型可用性与验证语义修复",
+      "sha256": "157327c50d3dde2c88fc087fccc0a8b65f0b2ee43417696f9fd510b4c8928619",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.1.7/ai-dict-0.1.7.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.1.6",
       "desc": "思考模型返回空内容时不再静默空白，明确报错并提示改用非思考模型",
       "sha256": "24c1701a9830c13e4e8baef388248d2dfb0167b7661ede7ff673099ad12ac866",
