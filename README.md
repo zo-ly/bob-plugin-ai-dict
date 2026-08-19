@@ -4,11 +4,11 @@ Bob 翻译插件：**句子正常翻译，单词/短语返回 Bob 原生词典�
 
 ## 效果
 
-| 单词 → 词典卡片 | 句子 → 普通翻译 |
-|:---:|:---:|
-| <img src="screenshots/dict-mode.png" width="380" alt="查单词：音标、词性词义、复数变形、例句、记忆提示"> | <img src="screenshots/sentence-mode.png" width="380" alt="翻译整句：与其他 AI 服务一致的普通译文"> |
+| 单词 → 词典卡片 | 缩写/术语 → 词典卡片 | 句子 → 普通翻译 |
+|:---:|:---:|:---:|
+| <img src="screenshots/dict-mode.png" width="300" alt="查单词：音标、词性词义、复数变形、例句、记忆提示"> | <img src="screenshots/abbr-mode.png" width="300" alt="查 YAGNI：有道音译成雅格尼、DeepSeek 原样返回，AI Dict 给出词义解释和记忆提示"> | <img src="screenshots/sentence-mode.png" width="300" alt="翻译整句：与其他 AI 服务一致的普通译文"> |
 
-查单词时展示音标（美/英）、词性词义、变形（可点击跳查）、例句和词根记忆提示；整句输入自动切回普通翻译模式。
+查单词时展示音标（美/英）、词性词义、变形（可点击跳查）、例句和词根记忆提示；YAGNI 这类传统词典查不到的缩写和术语也能给出靠谱解释（中图里有道音译成了「雅格尼」）；整句输入自动切回普通翻译模式。
 
 ## 原理
 
