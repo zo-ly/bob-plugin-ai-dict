@@ -36,6 +36,7 @@ export interface PluginOptions {
   model: string;
   dictPromptExtra: string;
   translatePrompt: string;
+  extraBody: string;
 }
 
 export interface ChatMessage {

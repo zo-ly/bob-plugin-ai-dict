@@ -1,5 +1,12 @@
 import type { HttpResponse, PluginValidate, ValidationCompletion } from '@bob-translate/types';
-import { apiMessageOf, emptyContentMessage, getOptions, parseData } from './translate';
+import {
+  apiMessageOf,
+  emptyContentMessage,
+  extraBodyErrorMessage,
+  getOptions,
+  parseData,
+  parseExtraBody,
+} from './translate';
 
 type ValidationResult = Parameters<ValidationCompletion>[0];
 
@@ -43,7 +50,18 @@ export function validationOf(resp: HttpResponse): ValidationResult {
 
 // 设置页「验证服务」按钮：发一次最小的非流式 chat 请求，校验 API 地址 / Key / 模型是否可用
 export const pluginValidate: PluginValidate = (completion) => {
-  const { apiUrl, apiKey, model } = getOptions();
+  const { apiUrl, apiKey, model, extraBody } = getOptions();
+
+  let extra: Record<string, unknown> | null = null;
+  try {
+    extra = parseExtraBody(extraBody);
+  } catch {
+    completion({
+      result: false,
+      error: { type: 'param', message: extraBodyErrorMessage, addition: '' },
+    });
+    return;
+  }
 
   if (!apiKey && apiUrl.indexOf('api.openai.com') !== -1) {
     completion({
@@ -66,6 +84,8 @@ export const pluginValidate: PluginValidate = (completion) => {
     body: {
       model,
       temperature: 0,
+      ...extra,
+      // stream 和 messages 是结构性字段，附加参数不可覆盖
       stream: false,
       messages: [{ role: 'user', content: 'ping' }],
     },

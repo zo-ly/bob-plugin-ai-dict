@@ -27,11 +27,20 @@ Bob 的词典 UI 只在服务返回 [`toDict`](https://bobtranslate.com/plugin/o
 | 模型 | `gpt-4o-mini` / `deepseek-chat` / `grok-4-fast-non-reasoning` 等 |
 | 词典模式附加要求 | 追加到单词 Prompt 末尾，如"例句偏向计算机领域" |
 | 句子翻译 Prompt | 留空用内置；支持 `$sourceLang` `$targetLang` `$text` 变量 |
+| 附加请求参数 | 合并进请求体的 JSON 对象，原样透传；常用于关闭思考模式（见下） |
 
 模型优先选用**非思考模型**：对翻译类任务，开启推理并不能提升质量
 （[arXiv:2602.14763](https://arxiv.org/abs/2602.14763)），只会更慢更贵。插件不限制输出长度
 （不传 `max_tokens`），思考模型（Qwen3 默认思考模式、deepseek-v4-flash 等）也能出结果，只是需要
 等待思考完成；若服务端的默认输出上限被思考过程占满、没有返回正文，插件会给出明确报错。
+
+没有非思考型号可换的平台（如 DeepSeek V4 全系默认思考），用「附加请求参数」关闭思考模式，
+查词/翻译速度更快：
+
+| 平台 | 附加请求参数 |
+|------|------------|
+| DeepSeek V4（`deepseek-v4-flash` 等） | `{"thinking": {"type": "disabled"}}` |
+| SiliconFlow / DashScope 的 Qwen3 思考型号 | `{"enable_thinking": false}` |
 
 ## 开发
 

@@ -56,13 +56,25 @@
     {
       "identifier": "translatePrompt",
       "type": "text",
-      "title": "句子翻译 Prompt（可选）",
+      "title": "句子翻译 Prompt",
       "defaultValue": "",
       "desc": "留空使用内置翻译 Prompt；可用变量：$sourceLang、$targetLang、$text",
       "textConfig": {
         "type": "visible",
         "height": "80",
         "placeholderText": "你是一名资深译者，请将下面的 $sourceLang 文本翻译成地道的 $targetLang ..."
+      }
+    },
+    {
+      "identifier": "extraBody",
+      "type": "text",
+      "title": "附加请求参数",
+      "defaultValue": "",
+      "desc": "合并进请求体的 JSON，可关闭思考模式等",
+      "textConfig": {
+        "type": "visible",
+        "height": "60",
+        "placeholderText": "{\"thinking\": {\"type\": \"disabled\"}}"
       }
     }
   ]

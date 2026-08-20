@@ -1,6 +1,6 @@
 import type { HttpResponse } from '@bob-translate/types';
-import { describe, expect, it } from 'vitest';
-import { validationOf } from '../src/validate';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pluginValidate, validationOf } from '../src/validate';
 
 // 只构造被 validationOf 读取的字段，整体断言为 HttpResponse
 function resp(partial: { data?: unknown; statusCode?: number; error?: unknown }): HttpResponse {
@@ -51,5 +51,44 @@ describe('validationOf', () => {
       resp({ data: { choices: [{ message: { content: '', reasoning_content: 'thinking' } }] }, statusCode: 200 }),
     );
     expect(r).toEqual({ result: true });
+  });
+});
+
+describe('pluginValidate extra request body', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('merges extraBody into the validation request', () => {
+    vi.stubGlobal('$option', { apiKey: 'sk-test', model: 'm', extraBody: '{"thinking": {"type": "disabled"}}' });
+    let body: any = null;
+    vi.stubGlobal('$http', {
+      request: (cfg: any) => {
+        body = cfg.body;
+        cfg.handler({ response: { statusCode: 200 }, data: { choices: [{ message: { content: 'pong' } }] } });
+      },
+    });
+    let result: any = null;
+    pluginValidate((r: any) => {
+      result = r;
+    });
+    expect(body.thinking).toEqual({ type: 'disabled' });
+    expect(body.stream).toBe(false);
+    expect(result.result).toBe(true);
+  });
+
+  it('rejects invalid extraBody JSON before any request', () => {
+    vi.stubGlobal('$option', { apiKey: 'sk-test', extraBody: '{bad json' });
+    let requested = false;
+    vi.stubGlobal('$http', {
+      request: () => {
+        requested = true;
+      },
+    });
+    let result: any = null;
+    pluginValidate((r: any) => {
+      result = r;
+    });
+    expect(requested).toBe(false);
+    expect(result.result).toBe(false);
+    expect(result.error.type).toBe('param');
   });
 });

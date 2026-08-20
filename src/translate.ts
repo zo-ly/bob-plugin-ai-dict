@@ -2,7 +2,7 @@ import type { HttpResponse, TextTranslate, TextTranslateQuery, TextTranslateResu
 import { dictPreviewParagraphs, isCjkDictQuery, isDictQuery, parseDictText, textToParagraphs } from './dict';
 import { buildDictSystemPrompt, buildReverseDictSystemPrompt, buildTranslateSystemPrompt } from './prompt';
 import { createOpenAiSseParser } from './sse';
-import type { ChatCompletion, ChatRequestBody, PluginOptions } from './types';
+import type { ChatCompletion, ChatMessage, ChatRequestBody, PluginOptions } from './types';
 
 // onCompletion / onStream 的载荷类型未导出，从函数签名推导。
 type CompletionPayload = Parameters<TextTranslateQuery['onCompletion']>[0];
@@ -15,8 +15,23 @@ export function getOptions(): PluginOptions {
     model: ($option.model || '').trim() || 'gpt-4o-mini',
     dictPromptExtra: ($option.dictPromptExtra || '').trim(),
     translatePrompt: ($option.translatePrompt || '').trim(),
+    extraBody: ($option.extraBody || '').trim(),
   };
 }
+
+// 「附加请求参数」选项：合并进请求体的 JSON 对象。透传、插件不理解含义，
+// 用于按平台关思考等（DeepSeek V4 默认 high effort 思考且无非思考型号，只能参数关闭）。
+// 留空返回 null；非法输入抛出，由调用方转为用户可见错误。
+export function parseExtraBody(raw: string): Record<string, unknown> | null {
+  if (!raw) return null;
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('not a JSON object');
+  }
+  return parsed as Record<string, unknown>;
+}
+
+export const extraBodyErrorMessage = '「附加请求参数」不是合法的 JSON 对象，请检查插件设置';
 
 export function parseData(raw: HttpResponse['data']): ChatCompletion | null {
   let data: unknown = raw;
@@ -38,7 +53,7 @@ export function apiMessageOf(data: ChatCompletion | null, statusCode: number): s
 
 // 思考模型（Qwen3 默认思考模式、DeepSeek-R1 等）可能把输出额度全耗在思考上，
 // 只返回 reasoning_content 没有正文。翻译场景推理无益（arXiv:2602.14763），引导换模型而非加开关。
-const reasoningOnlyMessage = '输出额度被思考过程（reasoning_content）耗尽，没有返回正文，请改用非思考模型';
+const reasoningOnlyMessage = '输出额度被思考过程（reasoning_content）耗尽，没有返回正文，关闭思考或改用非思考模型';
 
 export function emptyContentMessage(data: ChatCompletion | null): string {
   const hasReasoning = data?.choices?.some((choice) => Boolean(choice.message?.reasoning_content?.trim()));
@@ -58,7 +73,15 @@ export const translate: TextTranslate = (query, completion) => {
     }
   }
 
-  const { apiUrl, apiKey, model, dictPromptExtra, translatePrompt } = getOptions();
+  const { apiUrl, apiKey, model, dictPromptExtra, translatePrompt, extraBody } = getOptions();
+
+  let extra: Record<string, unknown> | null = null;
+  try {
+    extra = parseExtraBody(extraBody);
+  } catch {
+    emitCompletion({ error: { type: 'param', message: extraBodyErrorMessage, addition: '' } });
+    return;
+  }
 
   if (!apiKey && apiUrl.indexOf('api.openai.com') !== -1) {
     emitCompletion({
@@ -86,17 +109,19 @@ export const translate: TextTranslate = (query, completion) => {
   const canStream = typeof $http.streamRequest === 'function' && typeof query.onStream === 'function';
 
   function buildBody(streamFlag: boolean): ChatRequestBody {
-    const body: ChatRequestBody = {
-      model,
-      temperature: 0.2,
-      stream: streamFlag,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: query.text },
-      ],
-    };
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: query.text },
+    ];
     // 不传 max_tokens：交给服务端默认上限。避免思考模型（额度被 reasoning 吃光）和
     // OpenAI 新模型（拒收 max_tokens、要求 max_completion_tokens）两类兼容性问题
+    const body: ChatRequestBody = { model, temperature: 0.2, stream: streamFlag, messages };
+    if (extra) {
+      Object.assign(body, extra);
+      // stream 和 messages 是插件的结构性字段，附加参数不可覆盖
+      body.stream = streamFlag;
+      body.messages = messages;
+    }
     return body;
   }
 
@@ -183,7 +208,20 @@ export const translate: TextTranslate = (query, completion) => {
         if (!stream?.text) return;
         const { deltas, reasoningDeltas, error } = parser.push(stream.text);
         if (error) streamError = error;
-        if (reasoningDeltas.length) sawReasoning = true;
+        if (reasoningDeltas.length && !sawReasoning) {
+          sawReasoning = true;
+          // 思考期间界面原本全空白，用户会以为插件卡死或太慢而放弃——
+          // 占位提示插件在等模型思考，并给出关闭思考的解法；正文一到即被真实预览替换
+          if (!targetText) {
+            query.onStream({
+              result: {
+                from: query.detectFrom,
+                to: query.detectTo,
+                toParagraphs: ['⏳ 模型思考中，建议关闭思考或改用非思考模型'],
+              },
+            });
+          }
+        }
         for (const delta of deltas) {
           targetText += delta;
           query.onStream({

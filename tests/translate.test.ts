@@ -348,6 +348,87 @@ describe('reverse dict (中文查英文)', () => {
   });
 });
 
+describe('thinking hint during reasoning', () => {
+  it('shows a placeholder hint while only reasoning deltas have arrived, replaced by real content', () => {
+    const previews: string[][] = [];
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({
+        text: `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'hmm' } }] })}\n\n`,
+      });
+      cfg.streamHandler({
+        text: `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'more' } }] })}\n\n`,
+      });
+      cfg.streamHandler({ text: sse('WORD: run\nPOS: v. | 跑') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        onStream: (p: Cfg) => previews.push(p.result.toParagraphs),
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(previews[0]?.join('\n')).toContain('思考中');
+    expect(previews).toHaveLength(2); // 提示只发一次，不随思考增量刷屏
+    expect(previews[1]?.join('\n')).toContain('run');
+    expect(final.result.toDict.word).toBe('run');
+  });
+});
+
+describe('extra request body (附加请求参数)', () => {
+  it('merges extraBody JSON into the request body', () => {
+    vi.stubGlobal('$option', { apiKey: 'sk-test', extraBody: '{"thinking": {"type": "disabled"}}' });
+    let body: Cfg = null;
+    onStreamReq = (cfg) => {
+      body = cfg.body;
+      cfg.streamHandler({ text: sse('WORD: run\nPOS: v. | 跑') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    translate(mkQuery(), () => {});
+    expect(body.thinking).toEqual({ type: 'disabled' });
+    expect(body.stream).toBe(true);
+  });
+
+  it('extraBody cannot override stream or messages', () => {
+    vi.stubGlobal('$option', { apiKey: 'sk-test', extraBody: '{"stream": false, "messages": []}' });
+    let body: Cfg = null;
+    onStreamReq = (cfg) => {
+      body = cfg.body;
+      cfg.streamHandler({ text: sse('WORD: run\nPOS: v. | 跑') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    translate(mkQuery(), () => {});
+    expect(body.stream).toBe(true);
+    expect(body.messages).toHaveLength(2);
+  });
+
+  it('invalid extraBody JSON → param error before any request', () => {
+    vi.stubGlobal('$option', { apiKey: 'sk-test', extraBody: '{thinking: disabled' });
+    let requested = false;
+    onStreamReq = () => {
+      requested = true;
+    };
+    onRequest = () => {
+      requested = true;
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(requested).toBe(false);
+    expect(final.error.type).toBe('param');
+    expect(final.error.message).toContain('JSON');
+  });
+});
+
 describe('compatibility & config', () => {
   it('old Bob without streamRequest → blocking path for a sentence', () => {
     stubHttp(false);
