@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.2.0",
+      "desc": "新增「附加请求参数」设置项，可关闭思考模式；思考等待时显示占位提示",
+      "sha256": "ef13275c5abd889f016514de622dea91c129ddf42e40584dc15dbb8b7d99fc6c",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.2.0/ai-dict-0.2.0.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.1.7",
       "desc": "移除 max_tokens 限制，思考模型可用性与验证语义修复",
       "sha256": "157327c50d3dde2c88fc087fccc0a8b65f0b2ee43417696f9fd510b4c8928619",
