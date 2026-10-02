@@ -2,6 +2,13 @@
   "identifier": "com.zoly.bobplugin.aidict",
   "versions": [
     {
+      "version": "0.3.0",
+      "desc": "词典音标改用有道数据源，修复前缀类单词缺音标",
+      "sha256": "5d22da62d4031fd6a8cbc5a4282ce2b3455402fc872d2599d3f9213dd46d945d",
+      "url": "https://github.com/zo-ly/bob-plugin-ai-dict/releases/download/v0.3.0/ai-dict-0.3.0.bobplugin",
+      "minBobVersion": "1.6.0"
+    },
+    {
       "version": "0.2.1",
       "desc": "修复单词查询流式预览闪烁",
       "sha256": "71fb60dc3ea17c9939c0c54a894b4f1a4622d020e952cd443830b63c780e031e",
