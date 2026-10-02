@@ -1,5 +1,16 @@
 import type { HttpResponse, TextTranslate, TextTranslateQuery, TextTranslateResult } from '@bob-translate/types';
-import { dictPreviewParagraphs, isCjkDictQuery, isDictQuery, parseDictText, textToParagraphs } from './dict';
+import {
+  applyYoudaoPhones,
+  dictHeadword,
+  dictPreviewParagraphs,
+  isCjkDictQuery,
+  isDictQuery,
+  parseDictText,
+  parseYoudaoPhones,
+  textToParagraphs,
+  type YoudaoPhones,
+  youdaoLookupUrl,
+} from './dict';
 import { buildDictSystemPrompt, buildReverseDictSystemPrompt, buildTranslateSystemPrompt } from './prompt';
 import { createOpenAiSseParser } from './sse';
 import type { ChatCompletion, ChatMessage, ChatRequestBody, PluginOptions } from './types';
@@ -125,6 +136,49 @@ export const translate: TextTranslate = (query, completion) => {
     return body;
   }
 
+  // 有道音标查询：与模型请求并行，出卡片前等它返回（最多 3 秒）。失败一律当作没有，回落到模型音标
+  let phonesWord = '';
+  let phonesDone = false;
+  let phones: YoudaoPhones | null = null;
+  let onPhonesDone: (() => void) | null = null;
+
+  function finishPhones(result: YoudaoPhones | null, timerId: number): void {
+    if (phonesDone) return;
+    phonesDone = true;
+    phones = result;
+    $timer.invalidate(timerId);
+    onPhonesDone?.();
+  }
+
+  function lookupPhones(word: string): void {
+    if (phonesWord || !word) return;
+    phonesWord = word;
+    // 实测 $http 超时后不回调 handler，超时由定时器兜底
+    const timerId = $timer.schedule({ interval: 3, repeats: false, handler: () => finishPhones(null, timerId) });
+    $http.request({
+      method: 'GET',
+      url: youdaoLookupUrl(word),
+      timeout: 3,
+      cancelSignal: query.cancelSignal,
+      handler(resp) {
+        finishPhones(resp.error ? null : parseYoudaoPhones(resp.data, word), timerId);
+      },
+    });
+  }
+
+  function emitResult(fullText: string): void {
+    if (!dictMode) {
+      emitCompletion({ result: buildResult(fullText) });
+      return;
+    }
+    lookupPhones(dictHeadword(fullText));
+    if (!phonesWord || phonesDone) {
+      emitCompletion({ result: buildResult(fullText) });
+    } else {
+      onPhonesDone = () => emitCompletion({ result: buildResult(fullText) });
+    }
+  }
+
   function buildResult(fullText: string): TextTranslateResult {
     const from = query.detectFrom;
     const to = query.detectTo;
@@ -132,7 +186,7 @@ export const translate: TextTranslate = (query, completion) => {
       const dict = parseDictText(fullText, query.text.trim());
       if (dict) {
         // 词典结果按 Bob 约定不带 toParagraphs；类型要求它，故断言以保持载荷形状
-        return { from, to, toDict: dict } as TextTranslateResult;
+        return { from, to, toDict: applyYoudaoPhones(dict, phones) } as TextTranslateResult;
       }
       return { from, to, toParagraphs: dictPreviewParagraphs(fullText) };
     }
@@ -186,7 +240,7 @@ export const translate: TextTranslate = (query, completion) => {
           emitCompletion(apiError(statusCode, emptyContentMessage(data)));
           return;
         }
-        emitCompletion({ result: buildResult(content) });
+        emitResult(content);
       },
     });
   }
@@ -230,6 +284,7 @@ export const translate: TextTranslate = (query, completion) => {
             const complete = targetText.slice(0, targetText.lastIndexOf('\n') + 1);
             if (!complete.trim() || complete === dictPreviewSource) continue;
             dictPreviewSource = complete;
+            if (reverseDict) lookupPhones(dictHeadword(complete));
           }
           query.onStream({
             result: {
@@ -248,7 +303,7 @@ export const translate: TextTranslate = (query, completion) => {
         }
         // 已流出内容：直接用，不因收尾状态码丢弃
         if (targetText.trim()) {
-          emitCompletion({ result: buildResult(targetText) });
+          emitResult(targetText);
           return;
         }
         // 以下均为一个 delta 都没拿到的情况
@@ -273,6 +328,7 @@ export const translate: TextTranslate = (query, completion) => {
     });
   }
 
+  if (forwardDict) lookupPhones(query.text.trim());
   if (canStream) {
     runStream();
   } else {

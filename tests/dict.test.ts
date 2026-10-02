@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { dictPreviewParagraphs, isCjkDictQuery, isDictQuery, parseDictText } from '../src/dict';
+import {
+  applyYoudaoPhones,
+  dictHeadword,
+  dictPreviewParagraphs,
+  isCjkDictQuery,
+  isDictQuery,
+  parseDictText,
+  parseYoudaoPhones,
+} from '../src/dict';
 
 const sample = [
   'WORD: run',
@@ -112,4 +120,55 @@ describe('isCjkDictQuery', () => {
     expect(isCjkDictQuery('Saturday')).toBe(false);
   });
   it('rejects empty input', () => expect(isCjkDictQuery('  ')).toBe(false));
+});
+
+describe('youdao phones', () => {
+  const yd = (word: string, us?: string, uk?: string) => ({
+    ec: { word: [{ 'return-phrase': { l: { i: word } }, usphone: us, ukphone: uk }] },
+  });
+
+  it('parses us/uk phones from object or JSON string', () => {
+    expect(parseYoudaoPhones(yd('record', 'ˈrekərd; rɪˈkɔːrd', 'ˈrekɔːd'), 'record')).toEqual({
+      word: 'record',
+      us: 'ˈrekərd; rɪˈkɔːrd',
+      uk: 'ˈrekɔːd',
+    });
+    expect(parseYoudaoPhones(JSON.stringify(yd('Apple', 'ˈæp(ə)l')), 'apple')?.us).toBe('ˈæp(ə)l');
+  });
+
+  it('returns null for mismatched headword, no phones, or malformed data', () => {
+    expect(parseYoudaoPhones(yd('receive', 'rɪˈsiːv'), 'recieve')).toBeNull();
+    expect(parseYoudaoPhones(yd('recieve'), 'recieve')).toBeNull();
+    expect(parseYoudaoPhones('<html>', 'run')).toBeNull();
+    expect(parseYoudaoPhones({ ec: {} }, 'run')).toBeNull();
+    expect(parseYoudaoPhones(null, 'run')).toBeNull();
+  });
+
+  const dict = parseDictText('WORD: run\nUS: rʌn\nUK: rʌn\nPOS: v. | 跑', 'run')!;
+
+  it('youdao overrides the types it has and keeps model phones for the rest', () => {
+    const out = applyYoudaoPhones(dict, { word: 'run', uk: 'rʌn(UK)' });
+    expect(out.phonetics.map((p) => [p.type, p.value])).toEqual([
+      ['us', 'rʌn'],
+      ['uk', 'rʌn(UK)'],
+    ]);
+    expect(out.phonetics[1]?.tts?.value).toContain('type=1');
+  });
+
+  it('adds phones the model omitted', () => {
+    const bare = parseDictText('WORD: pre\nPOS: prefix. | 在…之前', 'pre')!;
+    const out = applyYoudaoPhones(bare, { word: 'pre', us: 'prɪ', uk: 'ˈpriː' });
+    expect(out.phonetics.map((p) => p.type)).toEqual(['us', 'uk']);
+    expect(out.phonetics[0]?.tts?.value).toContain('audio=pre');
+  });
+
+  it('ignores null or phones for a different word', () => {
+    expect(applyYoudaoPhones(dict, null)).toBe(dict);
+    expect(applyYoudaoPhones(dict, { word: 'ran', us: 'ræn' })).toBe(dict);
+  });
+
+  it('dictHeadword reads the WORD line', () => {
+    expect(dictHeadword('WORD: Saturday\r\nUS: x\n')).toBe('Saturday');
+    expect(dictHeadword('I love you.')).toBe('');
+  });
 });

@@ -162,3 +162,52 @@ export function textToParagraphs(text: string): string[] {
     .filter((line) => line);
   return paragraphs.length ? paragraphs : [text || ''];
 }
+
+// 有道查词接口：音标统一取自这里，与发音（dictvoice）同源
+export function youdaoLookupUrl(word: string): string {
+  return `https://dict.youdao.com/jsonapi?q=${encodeURIComponent(word)}`;
+}
+
+export interface YoudaoPhones {
+  word: string;
+  us?: string;
+  uk?: string;
+}
+
+// 非公开接口，结构随时可能变：任何不符合预期的情况都返回 null，由调用方回落到模型音标
+export function parseYoudaoPhones(raw: unknown, word: string): YoudaoPhones | null {
+  let data: unknown = raw;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  const words = (data as { ec?: { word?: unknown } } | null)?.ec?.word;
+  const entry = (Array.isArray(words) ? words[0] : words) as
+    | { usphone?: unknown; ukphone?: unknown; 'return-phrase'?: { l?: { i?: unknown } } }
+    | undefined;
+  // 词条须与查询词一致，防止有道纠错到别的词
+  const returned = entry?.['return-phrase']?.l?.i;
+  if (typeof returned !== 'string' || returned.toLowerCase() !== word.toLowerCase()) return null;
+  const phone = (v: unknown) => (typeof v === 'string' && stripSlashes(v)) || undefined;
+  const phones: YoudaoPhones = { word, us: phone(entry?.usphone), uk: phone(entry?.ukphone) };
+  return phones.us || phones.uk ? phones : null;
+}
+
+// 有道给了的类型覆盖模型音标，没给的保留模型的；顺序固定美、英
+export function applyYoudaoPhones(dict: DictObject, phones: YoudaoPhones | null): DictObject {
+  if (!phones || phones.word.toLowerCase() !== dict.word.toLowerCase()) return dict;
+  const phonetics: Phonetic[] = [];
+  for (const type of ['us', 'uk'] as const) {
+    const value = phones[type] || dict.phonetics.find((p) => p.type === type)?.value;
+    if (value) phonetics.push({ type, value, tts: youdaoTts(dict.word, type) });
+  }
+  return { ...dict, phonetics };
+}
+
+// 从已收到的完整行里取 WORD，反向词典据此尽早发起有道查询
+export function dictHeadword(text: string): string {
+  return /^WORD:[ \t]*(.+?)[ \t\r]*$/m.exec(text)?.[1] ?? '';
+}

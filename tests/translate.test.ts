@@ -9,6 +9,8 @@ function sse(delta: string): string {
 type Cfg = any;
 let onStreamReq: ((cfg: Cfg) => void) | null;
 let onRequest: ((cfg: Cfg) => void) | null;
+let onYoudao: (cfg: Cfg) => void;
+let timers: Map<number, () => void>;
 
 function mkQuery(over: Record<string, unknown> = {}): TextTranslateQuery {
   return {
@@ -22,7 +24,9 @@ function mkQuery(over: Record<string, unknown> = {}): TextTranslateQuery {
 }
 
 function stubHttp(withStream = true): void {
-  const http: Record<string, unknown> = { request: (cfg: Cfg) => onRequest?.(cfg) };
+  const http: Record<string, unknown> = {
+    request: (cfg: Cfg) => (String(cfg.url).includes('dict.youdao.com/jsonapi') ? onYoudao(cfg) : onRequest?.(cfg)),
+  };
   if (withStream) http.streamRequest = (cfg: Cfg) => onStreamReq?.(cfg);
   vi.stubGlobal('$http', http);
 }
@@ -30,6 +34,18 @@ function stubHttp(withStream = true): void {
 beforeEach(() => {
   onStreamReq = null;
   onRequest = null;
+  // 默认有道不可用：现有用例保持只用模型音标
+  onYoudao = (cfg) => cfg.handler({ error: { message: 'offline' } });
+  timers = new Map();
+  let nextTimer = 1;
+  vi.stubGlobal('$timer', {
+    schedule: (o: Cfg) => {
+      const id = nextTimer++;
+      timers.set(id, o.handler);
+      return id;
+    },
+    invalidate: (id: number) => timers.delete(id),
+  });
   vi.stubGlobal('$option', { apiKey: 'sk-test' });
   stubHttp(true);
 });
@@ -512,5 +528,189 @@ describe('dict stream preview', () => {
     }
     expect(previews.flat()).not.toContain('');
     expect(previews[1]).toEqual(['run', '美 /rʌn/']);
+  });
+});
+
+describe('youdao phonetics', () => {
+  const yd = (word: string, us?: string, uk?: string) => ({
+    response: { statusCode: 200 },
+    data: { ec: { word: [{ 'return-phrase': { l: { i: word } }, usphone: us, ukphone: uk }] } },
+  });
+  const dictText = 'WORD: pre\nPOS: prefix. | 在…之前\n';
+
+  it('forward dict: looks up the query in parallel and fills phones the model omitted', () => {
+    const order: string[] = [];
+    let ydCfg: Cfg = null;
+    onYoudao = (cfg) => {
+      order.push('youdao');
+      ydCfg = cfg;
+      cfg.handler(yd('pre', 'prɪ', 'ˈpriː'));
+    };
+    onStreamReq = (cfg) => {
+      order.push('model');
+      cfg.streamHandler({ text: sse(dictText) });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        text: 'pre',
+        cancelSignal: 'CANCEL',
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(order).toEqual(['youdao', 'model']);
+    expect(ydCfg.url).toContain('q=pre');
+    expect(ydCfg.timeout).toBe(3);
+    expect(ydCfg.cancelSignal).toBe('CANCEL');
+    expect(final.result.toDict.phonetics.map((p: Cfg) => [p.type, p.value])).toEqual([
+      ['us', 'prɪ'],
+      ['uk', 'ˈpriː'],
+    ]);
+  });
+
+  it('waits for youdao when the model finishes first', () => {
+    let ydCfg: Cfg = null;
+    onYoudao = (cfg) => {
+      ydCfg = cfg;
+    };
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({ text: sse('WORD: run\nUS: rʌn\nUK: rʌn\nPOS: v. | 跑\n') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final).toBeNull();
+    ydCfg.handler(yd('run', 'rʌn(yd)'));
+    expect(final.result.toDict.phonetics.map((p: Cfg) => p.value)).toEqual(['rʌn(yd)', 'rʌn']);
+  });
+
+  it('youdao never answering: the 3s timer releases the card with model phones', () => {
+    let ydCfg: Cfg = null;
+    onYoudao = (cfg) => {
+      ydCfg = cfg;
+    };
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({ text: sse('WORD: run\nUS: rʌn\nPOS: v. | 跑\n') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final).toBeNull();
+    expect(timers.size).toBe(1);
+    for (const fire of timers.values()) fire();
+    expect(final.result.toDict.phonetics.map((p: Cfg) => p.value)).toEqual(['rʌn']);
+    // 定时器之后才到的有道结果不再触发第二次回调
+    ydCfg.handler({ response: { statusCode: 200 }, data: {} });
+    expect(final.result.toDict.phonetics.map((p: Cfg) => p.value)).toEqual(['rʌn']);
+  });
+
+  it('youdao answering cancels the timer', () => {
+    onYoudao = (cfg) => cfg.handler({ error: { message: 'offline' } });
+    onStreamReq = (cfg) => cfg.handler({ response: { statusCode: 200 }, data: '' });
+    onRequest = (cfg) =>
+      cfg.handler({
+        response: { statusCode: 200 },
+        data: { choices: [{ message: { content: 'WORD: run\nPOS: v. | 跑' } }] },
+      });
+    translate(mkQuery(), () => {});
+    expect(timers.size).toBe(0);
+  });
+
+  it('youdao failure falls back to model phones', () => {
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({ text: sse('WORD: run\nUS: rʌn\nPOS: v. | 跑\n') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.result.toDict.phonetics.map((p: Cfg) => [p.type, p.value])).toEqual([['us', 'rʌn']]);
+  });
+
+  it('reverse dict: looks up the english WORD once its line arrives', () => {
+    const lookups: string[] = [];
+    let modelDone = false;
+    onYoudao = (cfg) => {
+      expect(modelDone).toBe(false); // 流式途中就发起，而非等模型结束
+      lookups.push(cfg.url);
+      cfg.handler(yd('Saturday', 'ˈsætərdeɪ', 'ˈsætədeɪ'));
+    };
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({ text: sse('WORD: Saturday\n') });
+      cfg.streamHandler({ text: sse('POS: n. | 星期六\n') });
+      modelDone = true;
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        text: '星期六',
+        detectFrom: 'zh-Hans',
+        detectTo: 'en',
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(lookups).toHaveLength(1);
+    expect(lookups[0]).toContain('q=Saturday');
+    expect(final.result.toDict.phonetics.map((p: Cfg) => p.value)).toEqual(['ˈsætərdeɪ', 'ˈsætədeɪ']);
+  });
+
+  it('blocking path merges youdao phones too', () => {
+    stubHttp(false);
+    onYoudao = (cfg) => cfg.handler(yd('pre', 'prɪ'));
+    onRequest = (cfg) =>
+      cfg.handler({ response: { statusCode: 200 }, data: { choices: [{ message: { content: dictText } }] } });
+    let final: Cfg = null;
+    translate(
+      mkQuery({
+        text: 'pre',
+        onStream: undefined,
+        onCompletion: (p: Cfg) => {
+          final = p;
+        },
+      }),
+      () => {},
+    );
+    expect(final.result.toDict.phonetics.map((p: Cfg) => [p.type, p.value])).toEqual([['us', 'prɪ']]);
+  });
+
+  it('sentence translation never calls youdao', () => {
+    let called = false;
+    onYoudao = () => {
+      called = true;
+    };
+    onStreamReq = (cfg) => {
+      cfg.streamHandler({ text: sse('你好，世界。') });
+      cfg.handler({ response: { statusCode: 200 }, data: '' });
+    };
+    translate(mkQuery({ text: 'Hello there, how are you doing today?' }), () => {});
+    expect(called).toBe(false);
   });
 });
